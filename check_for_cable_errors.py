@@ -112,23 +112,6 @@ if __name__ == "__main__":
 
     logger.critical("Started")
 
-    """Config t
-authentication mac-move permit
-show run | in authentication
-wr mem
-exit"""
-
-    """
-    dvaswshm1.dv9119#config t
-Enter configuration commands, one per line.  End with CNTL/Z.
-dvaswshm1.dv9119(config)#authentication mac-move permit
-dvaswshm1.dv9119(config)#end
-
-dvaswshm1.dv9119#show run | in authentication mac-move
-authentication mac-move permit
-dvaswshm1.dv9119#wr mem
-"""
-
     devices = """switch1
     switch2
     switch3

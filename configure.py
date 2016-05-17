@@ -113,14 +113,14 @@ wr mem
 exit"""
 
     """
-    dvaswshm1.dv9119#config t
+    switch1#config t
 Enter configuration commands, one per line.  End with CNTL/Z.
-dvaswshm1.dv9119(config)#authentication mac-move permit
-dvaswshm1.dv9119(config)#end
+switch1#(config)#authentication mac-move permit
+switch1#(config)#end
 
-dvaswshm1.dv9119#show run | in authentication mac-move
+switch1##show run | in authentication mac-move
 authentication mac-move permit
-dvaswshm1.dv9119#wr mem
+switch1##wr mem
 """
 
     devices = """switch1
