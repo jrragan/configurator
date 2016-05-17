@@ -2,6 +2,7 @@ import functools
 import logging
 import multiprocessing
 import random
+import re
 import time
 
 import sys
@@ -10,9 +11,21 @@ import traceback
 from SSHInteractive import SSHInteractive
 from configure_threading import thread_this
 
-logger = logging.getLogger('configure')
+logger = logging.getLogger('check_for_cable_errors')
 
-def change_mac(device, user="user", passwd="password", checkdict={"show version" : None}, actionlist=None):
+
+def get_switch_members(output):
+    logger.debug('Gathering switch stack members')
+    switches = []
+    for line in output.splitlines():
+        m = re.match('.([0-9]) .*(ctive|tandby|ember).*$', line)
+        if m:
+            switches.append(m.group(1))
+
+    return switches
+
+
+def check_for_cable_errors(device, user="user", passwd="password", cmdlist1=[], cmdlist2=[]):
     """
 
     :param device:
@@ -25,8 +38,8 @@ def change_mac(device, user="user", passwd="password", checkdict={"show version"
     time.sleep(3 * random.random())
     device = device.strip()
     logger.info(device)
-    logger.info("="*40)
-    #Set up prompts
+    logger.info("=" * 40)
+    # Set up prompts
     if not device.lower().endswith(".homedepot.com"):
         preprompt = device
         prompt = device.strip() + "#"
@@ -36,15 +49,8 @@ def change_mac(device, user="user", passwd="password", checkdict={"show version"
         prompt = preprompt + "#"
     logger.debug(prompt)
     devob = SSHInteractive(device, prompt)
-    this_action_list = []
 
-    #Replace prompts in actionlist with actual device prompts
-    if actionlist is not None:
-        for command, prompt in actionlist:
-            this_action_list.append((command, preprompt + prompt))
-        logger.debug("New action list {}".format(this_action_list))
-
-    #SSH
+    # SSH
     try:
         logger.info('Making ssh connection to {}'.format(device))
         devob.sshconnect(username=user, password=passwd)
@@ -54,34 +60,34 @@ def change_mac(device, user="user", passwd="password", checkdict={"show version"
         return device, None, exc
     if devob.sshconnected:
         try:
-            if actionlist is not None:
-                logger.info("Action!!!!! for device {}".format(device))
-                action_response = devob.ssh_cmd_action(this_action_list)
-                logger.debug("action responsed for {}: {}".format(device, action_response))
-            logger.info("Check!!!! for device {}".format(device))
-            passed, check_response = devob.ssh_parse_test(checkdict)
-            logger.info("Check response for {}: {}".format(device, check_response))
-            result = device, True, check_response
-            if not passed:
-                logger.info("{} has failed testing. ".format(device))
-                result = device, False, check_response
-        except Exception as exc:
-            logger.info("Exception encountered while sending commands to device {}".format(device))
-            logger.debug(exc)
-            return device, None, exc
+            result_cmdlist1 = devob.ssh_cmd_run(cmdlist1)
+            switches = get_switch_members(result_cmdlist1)
+            errors = {}
+            for switch in switches:
+                result_errors = devob.ssh_cmd_run('show platform port-asic 0 read register SifRacRwCrcErrorCnt switch ' + switch)
+                errors[switch] = result_errors
+                logger.debug("device {} switch {} error result {}".format(device, switch, result_errors))
+            result_cmdlist2 = devob.ssh_cmd_run(cmdlist2)
+        except:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            stacktrace = traceback.extract_tb(exc_traceback)
+            logger.error(sys.exc_info())
+            logger.error(stacktrace)
+            logger.critical("Exception encountered while sending commands to device {}".format(device))
+            return [device, None, sys.exc_info()]
     response_filename = device + time.strftime("_%y%m%d%H%M%S", time.gmtime()) + '.txt'
     try:
         with open(response_filename, 'wt') as logs:
-            if actionlist is not None: logs.write(action_response)
-            logs.write("change mac response: ".format(str(check_response)))
+            logs.write(result_cmdlist1)
+            logs.write("\n\n", str(errors))
+            logs.write("\n\n", result_cmdlist2)
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         stacktrace = traceback.extract_tb(exc_traceback)
-        logger.debug(sys.exc_info())
-        logger.debug(stacktrace)
-        logger.debug("For some reason the output file, " + response_filename + " for " + device + " cannot be created.")
-    logger.debug("change mac result: ".format(result))
-    return result
+        logger.error(sys.exc_info())
+        logger.error(stacktrace)
+        logger.critical("For some reason the output file, " + response_filename + " for " + device + " cannot be created.")
+
 
 
 if __name__ == "__main__":
@@ -128,16 +134,18 @@ dvaswshm1.dv9119#wr mem
     switch3
 """.splitlines()
     print(devices)
-    actionlist = [('config t', r'\(config\)#'), ('authentication mac-move permit', r'\(config\)#'), ('end', '#'), ('wr mem', '#')]
-    checkdict = {'show run | in authentication mac-move' : {'existl' : [r'authentication mac-move permit']}}
     username = 'username'
     password = 'password'
 
-    change_mac_partial = functools.partial(change_mac, user=username, passwd=password, checkdict=checkdict, actionlist=None)
+    cmd_list1 = ["show switch"]
+    cmd_list2 = ["show clock", "show switch stack-ports", "show switch stack-ports summ"]
+
+    check_for_cable_errors_partial = functools.partial(check_for_cable_errors, user=username, passwd=password, cmdlist1=cmd_list1,
+                                           cmdlist2=cmd_list2)
     num_threads = min(len(devices), multiprocessing.cpu_count() * 4)
 
     start = time.time()
-    results = thread_this(change_mac_partial, devices, max_threads=num_threads)
+    results = thread_this(check_for_cable_errors_partial, devices, max_threads=num_threads)
     print("{} threads total time : {}".format(num_threads, time.time() - start))
 
     print(results)

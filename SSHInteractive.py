@@ -182,15 +182,20 @@ class SSHInteractive(SshConnect):
         :param parselist: dictionary
         :return: dictionary
         """
-
+        parseresults = {}
+        passed = True
         for cmdr in parselist:
             self.logger.debug("SSHInteractive ssh_parse_test: Sending command {} to {}".format(cmdr, self.host))
             response = self.ssh_cmd_run(cmdr)
             self.logger.debug("SSHInteractive ssh_parse_test: " + self.host + " - Results of {}".format(response))
             self.logger.debug("SSHInteractive ssh_parse_test: " + self.host + " - Testng {} {}".format(response, parselist[cmdr]))
-            parseresult = commandparse(Configparse(response), parselist[cmdr])
-            self.logger.debug("SSHInteractive ssh_parse_test: result of testing: {}".format(str(parseresult)))
-            for result in parseresult.values():
-                if (False in result) or (None in result) or ('Error' in result):
-                    self.logger.error("SSHInteractive ssh_parse_test: {} has failed this test. ".format(self.host))
-        return parseresult
+            parseresult = response
+            if parselist[cmdr] is not None:
+                parseresult = commandparse(Configparse(response), parselist[cmdr])
+                self.logger.debug("SSHInteractive ssh_parse_test: result of testing: {}".format(str(parseresult)))
+                for result in parseresult.values():
+                    if (False in result) or (None in result) or ('Error' in result):
+                        self.logger.error("SSHInteractive ssh_parse_test: {} has failed this test. Result {} for cmdr {}".format(self.host, result, cmdr))
+                        passed = False
+            parseresults[cmdr] = parseresult
+        return passed, parseresults
