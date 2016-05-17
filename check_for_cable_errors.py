@@ -40,12 +40,12 @@ def check_for_cable_errors(device, user="user", passwd="password", cmdlist1=[], 
     logger.info(device)
     logger.info("=" * 40)
     # Set up prompts
-    if not device.lower().endswith(".homedepot.com"):
+    if not device.lower().endswith(".example.com"):
         preprompt = device
         prompt = device.strip() + "#"
-        device = preprompt + ".homedepot.com"
+        device = preprompt + ".example.com"
     else:
-        preprompt = device.replace('homedepot.com', '')
+        preprompt = device.replace('example.com', '')
         prompt = preprompt + "#"
     logger.debug(prompt)
     devob = SSHInteractive(device, prompt)

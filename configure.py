@@ -27,12 +27,12 @@ def change_mac(device, user="user", passwd="password", checkdict={"show version"
     logger.info(device)
     logger.info("="*40)
     #Set up prompts
-    if not device.lower().endswith(".homedepot.com"):
+    if not device.lower().endswith(".example.com"):
         preprompt = device
         prompt = device.strip() + "#"
-        device = preprompt + ".homedepot.com"
+        device = preprompt + ".example.com"
     else:
-        preprompt = device.replace('homedepot.com', '')
+        preprompt = device.replace('example.com', '')
         prompt = preprompt + "#"
     logger.debug(prompt)
     devob = SSHInteractive(device, prompt)
@@ -113,7 +113,7 @@ wr mem
 exit"""
 
     """
-    switch1#config t
+switch1#config t
 Enter configuration commands, one per line.  End with CNTL/Z.
 switch1#(config)#authentication mac-move permit
 switch1#(config)#end
@@ -133,7 +133,7 @@ switch1##wr mem
     username = 'username'
     password = 'password'
 
-    change_mac_partial = functools.partial(change_mac, user=username, passwd=password, checkdict=checkdict, actionlist=None)
+    change_mac_partial = functools.partial(change_mac, user=username, passwd=password, checkdict=checkdict, actionlist=actionlist)
     num_threads = min(len(devices), multiprocessing.cpu_count() * 4)
 
     start = time.time()
