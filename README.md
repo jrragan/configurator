@@ -2,6 +2,8 @@ Python 3 and Paramiko required
 
 # configurator
 
+### Example
+
 configure.py and check_for_cable_errors.py are examples for using the other modules.
 
 From configure.py, the other modules are imported
@@ -29,6 +31,9 @@ and then test that the configuration was applied
     authentication mac-move permit
     switch1##wr mem
 ```
+
+The function is called "change_mac" but it is not limited to that purpose. It can be used to do any similar set of configuration
+changes and post-change checks.
   
 The function
 
@@ -94,7 +99,30 @@ The main method creates a partial function, but this is optional.
     num_threads = min(len(devices), multiprocessing.cpu_count() * 4)
 
     start = time.time()
-  r  esults = thread_this(change_mac_partial, devices, max_threads=num_threads)
+    results = thread_this(change_mac_partial, devices, max_threads=num_threads)
 ```
 The multithreading is done with concurrent.futures. The task is started by passing the partial function, the device list and the max threads parameter to the "thread_this" function. Since this task is IO bound, the num_threads can be very large. It has been tested up to 80 threads. 
 
+### Example 2 - show_ver.py
+
+The module show_ver.py contains the `simple_configure` function which is functionally identical to the `change_mac` function. 
+
+```Python
+devices = """172.16.1.139
+""".splitlines()
+    print(devices)
+    username = 'cisco'
+    password = 'cisco'
+
+    simple_configure_partial = functools.partial(simple_configure, prompt="csr1000v-1#", user=username, passwd=password)
+    num_threads = min(len(devices), multiprocessing.cpu_count() * 4)
+
+    start = time.time()
+    results = thread_this(simple_configure_partial, devices, max_threads=num_threads)
+    print("{} threads total time : {}".format(num_threads, time.time() - start))
+
+    print(results)
+    #print(results[0][2]['show version'])
+    ver = re.search(r"Cisco .*, +Version +(\S*)", results[0][2]['show version']).group(0)
+    print(ver)
+ ```
