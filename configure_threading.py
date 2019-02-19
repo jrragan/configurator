@@ -27,7 +27,7 @@ def wait_for(futures):
                 logger.debug("Exception: ".format(err))
                 results.append(err)
     except KeyboardInterrupt:
-        logger.info.report(" canceling...")
+        logger.info(" cancelling...")
         canceled = True
         for future in futures:
             future.cancel()

@@ -52,6 +52,7 @@ def change_mac(device, user="user", passwd="password", checkdict={"show version"
         logger.info("Exception encountered during SSH to device {}".format(device))
         logger.debug(exc)
         return device, None, exc
+    action_response, check_response, result = None, None, None
     if devob.sshconnected:
         try:
             if actionlist is not None:
@@ -73,14 +74,14 @@ def change_mac(device, user="user", passwd="password", checkdict={"show version"
     try:
         with open(response_filename, 'wt') as logs:
             if actionlist is not None: logs.write(action_response)
-            logs.write("change mac response: ".format(str(check_response)))
+            logs.write("check_response: ".format(str(check_response)))
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         stacktrace = traceback.extract_tb(exc_traceback)
         logger.debug(sys.exc_info())
         logger.debug(stacktrace)
         logger.debug("For some reason the output file, " + response_filename + " for " + device + " cannot be created.")
-    logger.debug("change mac result: ".format(result))
+    logger.debug("result: ".format(result))
     return result
 
 
