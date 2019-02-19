@@ -85,7 +85,7 @@ def change_mac(device, user="user", passwd="password", checkdict={"show version"
 
 
 if __name__ == "__main__":
-    LOGFILE = "cat3850macmove" + time.strftime("_%y%m%d%H%M%S", time.gmtime()) + ".log"
+    LOGFILE = "configure" + time.strftime("_%y%m%d%H%M%S", time.gmtime()) + ".log"
     SCREENLOGLEVEL = logging.DEBUG
     FILELOGLEVEL = logging.DEBUG
     format_string = '%(asctime)s: %(threadName)s - %(funcName)s - %(name)s - %(levelname)s - %(message)s'
