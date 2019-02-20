@@ -1,12 +1,8 @@
 import logging
-import socket
-import traceback
-import sys
-
-import time
-
 import re
-from lxml import etree
+import socket
+import sys
+import traceback
 
 import nxos_XML_errors
 from command_parser import commandparse, Configparse
@@ -34,7 +30,7 @@ class SSHInteractive(SshConnect):
         @param prompt: str, need a prompt so we can detect when a cli command has finished running
 
         """
-        SshConnect.__init__(self, host)
+        super().__init__(host)
         self.type = type
         self.prompt = prompt
         self.logger = logging.getLogger('SSHInteractive.SSHInteractive')
@@ -53,6 +49,7 @@ class SSHInteractive(SshConnect):
         Look for prompt from interactive shell
         @return:
         """
+        s = None
         try:
             self.logger.debug("Waiting for ssh shell prompt {}".format(self.prompt))
             s = self.rpexpect(self.prompt)
@@ -112,7 +109,7 @@ class SSHInteractive(SshConnect):
             self.logger.debug("SSHInteractive Send: receive message from device {}: {}".format(str(response), self.host))
             self.logger.debug(sys.exc_info())
             self.logger.debug(stacktrace)
-            self.closesession()
+            self.close()
             #do not propagate exception, closesession will raise one
         except:
             exc_type, exc_value, exc_traceback = sys.exc_info()

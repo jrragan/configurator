@@ -2,9 +2,8 @@ import functools
 import logging
 import multiprocessing
 import random
-import time
-
 import sys
+import time
 import traceback
 
 from SSHInteractive import SSHInteractive
@@ -12,7 +11,8 @@ from configure_threading import thread_this
 
 logger = logging.getLogger('configure')
 
-def change_mac(device, user="user", passwd="password", checkdict={"show version" : None}, actionlist=None):
+
+def configure_device(device, user="user", passwd="password", checkdict={"show version": None}, actionlist=None):
     """
 
     :param device:
@@ -25,8 +25,8 @@ def change_mac(device, user="user", passwd="password", checkdict={"show version"
     time.sleep(3 * random.random())
     device = device.strip()
     logger.info(device)
-    logger.info("="*40)
-    #Set up prompts
+    logger.info("=" * 40)
+    # Set up prompts
     if not device.lower().endswith(".example.com"):
         preprompt = device
         prompt = device.strip() + "#"
@@ -38,13 +38,13 @@ def change_mac(device, user="user", passwd="password", checkdict={"show version"
     devob = SSHInteractive(device, prompt)
     this_action_list = []
 
-    #Replace prompts in actionlist with actual device prompts
+    # Replace prompts in actionlist with actual device prompts
     if actionlist is not None:
         for command, prompt in actionlist:
             this_action_list.append((command, preprompt + prompt))
         logger.debug("New action list {}".format(this_action_list))
 
-    #SSH
+    # SSH
     try:
         logger.info('Making ssh connection to {}'.format(device))
         devob.sshconnect(username=user, password=passwd)
@@ -129,12 +129,14 @@ switch1##wr mem
     switch3
 """.splitlines()
     print(devices)
-    actionlist = [('config t', r'\(config\)#'), ('authentication mac-move permit', r'\(config\)#'), ('end', '#'), ('wr mem', '#')]
-    checkdict = {'show run | in authentication mac-move' : {'existl' : [r'authentication mac-move permit']}}
+    actionlist = [('config t', r'\(config\)#'), ('authentication mac-move permit', r'\(config\)#'), ('end', '#'),
+                  ('wr mem', '#')]
+    checkdict = {'show run | in authentication mac-move': {'existl': [r'authentication mac-move permit']}}
     username = 'username'
     password = 'password'
 
-    change_mac_partial = functools.partial(change_mac, user=username, passwd=password, checkdict=checkdict, actionlist=actionlist)
+    change_mac_partial = functools.partial(configure_device(), user=username, passwd=password, checkdict=checkdict,
+                                           actionlist=actionlist)
     num_threads = min(len(devices), multiprocessing.cpu_count() * 4)
 
     start = time.time()
@@ -142,4 +144,3 @@ switch1##wr mem
     print("{} threads total time : {}".format(num_threads, time.time() - start))
 
     print(results)
-

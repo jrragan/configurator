@@ -1,13 +1,16 @@
 import concurrent.futures
 import logging
 import multiprocessing
+import sys
+import traceback
 
-logger = logging.getLogger('multithreading')
+logger = logging.getLogger('configure_threading')
 
 
-def wait_for(futures):
+def wait_for(futures, timeout=None):
     """
 
+    :param timeout:
     :param futures:
     :return:
     """
@@ -16,16 +19,31 @@ def wait_for(futures):
     logger.info("Waiting for threading to complete...")
     try:
         for future in concurrent.futures.as_completed(futures):
-            err = future.exception()
-            if err is None:
-                result = future.result()
-                logger.debug("Result: ".format(result))
-                if result is None:
-                    logger.debug("Problem with result...")
-                results.append(result)
-            else:
-                logger.debug("Exception: ".format(err))
-                results.append(err)
+            try:
+                err = future.exception(timeout=timeout)
+                if err is None:
+                    result = future.result(timeout=timeout)
+                    logger.debug("Result: ".format(result))
+                    if result is None:
+                        logger.error("Problem with result...")
+                    results.append(result)
+                else:
+                    logger.debug("Exception: ".format(err))
+                    results.append("Error: future.exception: {}".format(err))
+            except TimeoutError as err:
+                logger.error("Timeout waiting for exception or for result.")
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                stacktrace = traceback.extract_tb(exc_traceback)
+                logger.debug(sys.exc_info())
+                logger.debug(stacktrace)
+                results.append("Error: Timeout: {}".format(err))
+            except:
+                logger.error("Unhandled exception waiting for fn in thread to complete.")
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                stacktrace = traceback.extract_tb(exc_traceback)
+                logger.debug(sys.exc_info())
+                logger.debug(stacktrace)
+                results.append("Error: {}".format(exc_type))
     except KeyboardInterrupt:
         logger.info(" cancelling...")
         canceled = True
@@ -34,7 +52,7 @@ def wait_for(futures):
     return canceled, results
 
 
-def thread_this(fn, vars=None, args=None, max_threads=multiprocessing.cpu_count()):
+def thread_this(fn, vars=None, args=None, max_threads=multiprocessing.cpu_count(), timeout=None):
     """
 
     :type args: dict
@@ -52,7 +70,7 @@ def thread_this(fn, vars=None, args=None, max_threads=multiprocessing.cpu_count(
             for var in vars:
                 future = executor.submit(fn, var, **args[var])
                 futures.add(future)
-            canceled, results = wait_for(futures)
+            canceled, results = wait_for(futures, timeout=timeout)
             if canceled:
                 logger.info("Cancelled...")
                 executor.shutdown()
@@ -60,7 +78,7 @@ def thread_this(fn, vars=None, args=None, max_threads=multiprocessing.cpu_count(
             for var in vars:
                 future = executor.submit(fn, var)
                 futures.add(future)
-            canceled, results = wait_for(futures)
+            canceled, results = wait_for(futures, timeout=timeout)
             if canceled:
                 logger.info("Cancelled...")
                 executor.shutdown()
@@ -68,7 +86,7 @@ def thread_this(fn, vars=None, args=None, max_threads=multiprocessing.cpu_count(
             for arg in args:
                 future = executor.submit(fn, arg, **args[arg])
                 futures.add(future)
-            canceled, results = wait_for(futures)
+            canceled, results = wait_for(futures, timeout=timeout)
             if canceled:
                 logger.info("Cancelled...")
                 executor.shutdown()

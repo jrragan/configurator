@@ -427,7 +427,8 @@ class SshConnect(object):
                         "rpexpect type 4 block: Timedout waiting for intial response.  Received response:  {0}".format(
                             buff))
                     raise socket.timeout(
-                        "Socket Timedout waiting for expected response {}.  Received response:  {0}".format(reguexp, buff))
+                        "Socket Timedout waiting for expected response {}.  Received response:  {}".format(reguexp,
+                                                                                                           buff))
                 buff += resp
                 #self.logger.debug("Second buff check in thread {0}".format(buff))
                 stend = time.time()
@@ -446,7 +447,7 @@ class SshConnect(object):
                         "Loop Timedout waiting for expected response {}. Received response {}".format(reguexp, buff))
                 if self._channel.exit_status_ready():
                     self.logger.error(
-                        "rpexpect type 4 block: Detected server closed channel while waiting for expected response {}. Received response {0:s}".format(
+                        "rpexpect type 4 block: Detected server closed channel while waiting for expected response {}. Received response {:s}".format(
                             reguexp, buff))
                     self.close()
                     raise ServerClosedChannelError(

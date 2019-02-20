@@ -2,8 +2,8 @@ import logging
 import multiprocessing
 import random
 import sys
-import traceback
 import time
+import traceback
 from copy import deepcopy
 
 from SSHInteractive import SSHInteractive
@@ -11,9 +11,10 @@ from configure_threading import thread_this
 
 logger = logging.getLogger('configure_multi_config')
 
-def change_device_config(device, user="user", passwd="password", checkdict={"show version" : None}, actionlist=None):
-    """
 
+def change_device_config(device, user="user", passwd="password", checkdict={"show version": None},
+                         actionlist=None, command_timeout=30):
+    """
     :param device:
     :param user:
     :param passwd:
@@ -24,8 +25,8 @@ def change_device_config(device, user="user", passwd="password", checkdict={"sho
     time.sleep(3 * random.random())
     device = device.strip()
     logger.info(device)
-    logger.info("="*40)
-    #Set up prompts
+    logger.info("=" * 40)
+    # Set up prompts
     if not device.lower().endswith(".example.com"):
         preprompt = device
         prompt = device.strip() + "#"
@@ -37,26 +38,27 @@ def change_device_config(device, user="user", passwd="password", checkdict={"sho
     devob = SSHInteractive(device, prompt)
     this_action_list = []
 
-    #Replace prompts in actionlist with actual device prompts
+    # Replace prompts in actionlist with actual device prompts
     if actionlist is not None:
         for command, prompt in actionlist:
             this_action_list.append((command, preprompt + prompt))
         logger.debug("New action list {}".format(this_action_list))
 
-    #SSH
+    # SSH
     try:
         logger.info('Making ssh connection to {}'.format(device))
-        devob.sshconnect(username=user, password=passwd)
+        devob.sshconnect(username=user, password=passwd, command_timeout=command_timeout)
     except Exception as exc:
         logger.info("Exception encountered during SSH to device {}".format(device))
         logger.debug(exc)
         return device, None, exc
+    action_response = check_response = result = None
     if devob.sshconnected:
         try:
             if actionlist is not None:
                 logger.info("Action!!!!! for device {}".format(device))
                 action_response = devob.ssh_cmd_action(this_action_list)
-                logger.debug("action responsed for {}: {}".format(device, action_response))
+                logger.debug("action response for {}: {}".format(device, action_response))
             logger.info("Check!!!! for device {}".format(device))
             passed, check_response = devob.ssh_parse_test(checkdict)
             logger.info("Check response for {}: {}".format(device, check_response))
@@ -65,7 +67,7 @@ def change_device_config(device, user="user", passwd="password", checkdict={"sho
                 logger.info("{} has failed testing. ".format(device))
                 result = device, False, check_response
         except Exception as exc:
-            logger.info("Exception encountered while sending commands to device {}".format(device))
+            logger.error("Exception encountered while sending commands to device {}".format(device))
             logger.debug(exc)
             return device, None, exc
     response_filename = device + time.strftime("_%y%m%d%H%M%S", time.gmtime()) + '.txt'
@@ -79,7 +81,7 @@ def change_device_config(device, user="user", passwd="password", checkdict={"sho
         logger.debug(sys.exc_info())
         logger.debug(stacktrace)
         logger.debug("For some reason the output file, " + response_filename + " for " + device + " cannot be created.")
-    logger.debug("change mac result: ".format(result))
+    logger.debug("configure_device: ".format(result))
     return result
 
 
@@ -115,8 +117,8 @@ if __name__ == "__main__":
             actionlist_dev[2][0] = actionlist_dev[2][0].format(device)
             checkdict_dev = deepcopy(checkdict)
             checkdict_dev['show run | in snmp']['existl'][0] = r'snmp-server chassis-id {}'.format(device)
-            device_vars[device] = {'username' : 'username', 'password' : 'password',
-                                   'actionlist' : actionlist_dev, 'checkdict' : checkdict_dev}
+            device_vars[device] = {'username': 'username', 'password': 'password',
+                                   'actionlist': actionlist_dev, 'checkdict': checkdict_dev}
     print(device_vars)
 
     username = 'username'
@@ -129,4 +131,3 @@ if __name__ == "__main__":
     print("{} threads total time : {}".format(num_threads, time.time() - start))
 
     print(results)
-
