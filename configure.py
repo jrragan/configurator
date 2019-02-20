@@ -12,7 +12,8 @@ from configure_threading import thread_this
 logger = logging.getLogger('configure')
 
 
-def configure_device(device, user="user", passwd="password", checkdict={"show version": None}, actionlist=None):
+def configure_device(device, user="user", passwd="password", enable_passwd="enable", check_priv=True,
+                     checkdict={"show version": None}, actionlist=None):
     """
 
     :param device:
@@ -20,6 +21,8 @@ def configure_device(device, user="user", passwd="password", checkdict={"show ve
     :param passwd:
     :param actionlist:
     :param checkdict:
+    :param enable_passwd: str, enable password
+    :param check_priv: if True, check if in privilege mode and attempt to put into privilege mode
     :return:
     """
     time.sleep(3 * random.random())
@@ -35,7 +38,7 @@ def configure_device(device, user="user", passwd="password", checkdict={"show ve
         preprompt = device.replace('example.com', '')
         prompt = preprompt + "#"
     logger.debug(prompt)
-    devob = SSHInteractive(device, prompt)
+    devob = SSHInteractive()
     this_action_list = []
 
     # Replace prompts in actionlist with actual device prompts
@@ -47,7 +50,8 @@ def configure_device(device, user="user", passwd="password", checkdict={"show ve
     # SSH
     try:
         logger.info('Making ssh connection to {}'.format(device))
-        devob.sshconnect(username=user, password=passwd)
+        devob.sshconnect(device, prompt, username=user, password=passwd, check_priv=check_priv,
+                         enable_passwd=enable_passwd)
     except Exception as exc:
         logger.info("Exception encountered during SSH to device {}".format(device))
         logger.debug(exc)

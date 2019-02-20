@@ -465,10 +465,10 @@ class SshConnect(object):
                     resp = self._channel.recv(9999)
                 except socket.timeout:
                     self.logger.error(
-                        "rpexpect type 5 block: Timedout waiting for intial response.  Received response:  {0}".format(
+                        "rpexpect type 5 block: Timed out waiting for intial response.  Received response:  {0}".format(
                             buff))
                     raise TimeoutExpiredError(
-                        "Socket Timedout waiting for expected response.  Received response:  {0}".format(buff))
+                        "Socket Timed out waiting for expected response.  Received response:  {0}".format(buff))
                 buff += resp
                 if self._channel.exit_status_ready():
                     self.logger.error(
