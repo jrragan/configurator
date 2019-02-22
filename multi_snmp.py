@@ -10,9 +10,9 @@ logger = logging.getLogger('multi_snmp')
 
 
 def generate_snmp(store):
-    cmd_list = ['snmp-server community CMS-IZIVHg5V RO', 'snmp-server trap-source GigabitEthernet1',
-                'snmp-server host 165.130.1.11 vrf mgmt public', 'snmp-server host 165.130.1.2 vrf mgmt public',
-                'snmp-server host 165.130.128.31 vrf mgmt public', ]
+    cmd_list = ['snmp-server community public RO', 'snmp-server trap-source GigabitEthernet1',
+                'snmp-server host 10.10.10.10 vrf mgmt public', 'snmp-server host 11.11.11.11 vrf mgmt public',
+                'snmp-server host 12.12.12.12 vrf mgmt public', ]
     rtr1_cmd_list = cmd_list + ['snmp-server chassis-id "{}"'.format('rtr1_' + store.strip().lower() + '_CSR1K'), ]
     rtr2_cmd_list = cmd_list + ['snmp-server chassis-id "{}"'.format('rtr2_' + store.strip().lower() + '_CSR2K'), ]
 
@@ -43,9 +43,9 @@ if __name__ == "__main__":
 
     stores = [('st1111', '172.16.1.110'), ('st2222', '172.16.1.111')]
     checkdict = {'show run | in snmp': {
-        'existl': [r'snmp-server trap-source GigabitEthernet1', r'snmp-server community CMS-IZIVHg5V RO',
-                   r'snmp-server host 165.130.1.11 vrf mgmt public', 'snmp-server host 165.130.1.2 vrf mgmt public',
-                   r'snmp-server host 165.130.128.31 vrf mgmt public', r'rtr\d_st\d\d\d\d_CSR']}}
+        'existl': [r'snmp-server trap-source GigabitEthernet1', r'snmp-server community public RO',
+                   r'snmp-server host 10.10.10.10 vrf mgmt public', 'snmp-server host 11.11.11.11 vrf mgmt public',
+                   r'snmp-server host 12.12.12.12 vrf mgmt public', r'rtr\d_st\d\d\d\d_CSR']}}
     device_vars = {}
     # with open("device_file.txt") as f:
     #     for device in f.readline():
