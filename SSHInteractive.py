@@ -1,3 +1,4 @@
+import getpass
 import logging
 import re
 import socket
@@ -39,7 +40,7 @@ class SSHInteractive(SshConnect):
 
         """
         self.logger = logging.getLogger('SSHInteractive.SSHInteractive')
-        self.logger.debug("Instantiating SSH object for {}".format(self.host))
+        self.logger.debug("Instantiating SSH object")
 
     def sshconnect(self, host, *args, prompt=None, username=None, password=None, type='Cisco', check_priv=True,
                    enable_password=None, **kwargs):
@@ -57,6 +58,18 @@ class SSHInteractive(SshConnect):
         """
         self.ssh_shell()
         self.look_for_prompt()
+        if self.check_priv:
+            try:
+                self.enable()
+                self.prompt = self.prompt + CISCO_PRIV_PROMPT
+            except:
+                self.logger.error("SSHInteractive look_for_prompt: failed to elevate to privileged mode")
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                stacktrace = traceback.extract_tb(exc_traceback)
+                self.logger.debug(sys.exc_info())
+                self.logger.debug(stacktrace)
+                self.close()
+                raise
 
     def look_for_prompt(self):
         """
@@ -65,22 +78,21 @@ class SSHInteractive(SshConnect):
         """
 
         if self.prompt is None:
-            self.prompt = self.set_base_prompt()
-        s = None
-        try:
-            self.logger.debug("Waiting for ssh shell prompt {}".format(self.prompt))
-            s = self.rpexpect(self.prompt)
-            self.logger.debug("Received from server {}".format(s))
-        except:
-            self.logger.error("Unexpected string from device {} - {}".format(self.host, s))
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            stacktrace = traceback.extract_tb(exc_traceback)
-            self.logger.debug(sys.exc_info())
-            self.logger.debug(stacktrace)
-            self.close()
-            raise
-        if self.check_priv and not self.check_enable_mode():
-            self.
+            self.set_base_prompt()
+        else:
+            s = None
+            try:
+                self.logger.debug("Waiting for ssh shell prompt {}".format(self.prompt))
+                s = self.rpexpect(self.prompt)
+                self.logger.debug("Received from server {}".format(s))
+            except:
+                self.logger.error("Unexpected string from device {} - {}".format(self.host, s))
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                stacktrace = traceback.extract_tb(exc_traceback)
+                self.logger.debug(sys.exc_info())
+                self.logger.debug(stacktrace)
+                self.close()
+                raise
 
 
     def _send(self, cmd, tprompt=None):
@@ -113,7 +125,7 @@ class SSHInteractive(SshConnect):
             self.logger.error(
                 "SSHInteractive Send: Socket timeout waiting for response to {} to {}".format(cmd, self.host))
             self.logger.debug(
-                "SSHInteractive Send: receive message from device {}: {}".format(str(response), self.host))
+                "SSHInteractive Send: receive message from device {}: {}".format(self.host, response))
             self.logger.debug(sys.exc_info())
             self.logger.debug(stacktrace)
             raise
@@ -155,6 +167,10 @@ class SSHInteractive(SshConnect):
         if re.search('ERROR', response):
             self.logger.error(
                 "SSHInteractive Send: Error at :  " + self.host + " while running :  " + cmd + "  Output:  " + response + "\n")
+            if 'Invalid input detected' in response:
+                self.logger.error(
+                    "SSHInteractive Send: Invalid Input detected on :  " + self.host + " while running :  " + cmd + "  Output:  " + response + "\n")
+                response = "ERROR: Invalid Input detected: " + response
         return response
 
     def ssh_cmd_run(self, cmdlist):
@@ -177,7 +193,15 @@ class SSHInteractive(SshConnect):
         self.logger.debug("SSHInteractive ssh_cmd_run: Sending response {}".format(buff))
         return buff
 
-    def ssh_cmd_action(self, cmdlist):
+    def ssh_cmd_action(self, cmdlist, replace_prompt=False, config=True, prompt=""):
+        this_action_list = []
+        if replace_prompt and config:
+            for command, prompt in cmdlist:
+                this_action_list.append((command, CISCO_CONFIG_PROMPT))
+        elif replace_prompt:
+            for command, prompt in cmdlist:
+                this_action_list.append((command, self.base_prompt + prompt))
+            logger.debug("New action list {}".format(this_action_list))
         self.logger.debug("SSHInteractive ssh_cmd_action: action list: {}".format(cmdlist))
         buff = ''
         try:
@@ -193,13 +217,49 @@ class SSHInteractive(SshConnect):
         self.logger.debug("SSHInteractive ssh_cmd_action: Sending response {}".format(buff))
         return buff
 
-    def ssh_cmd_set(self, cmdlist, prompt=r'[^\(\)]#'):
+    def ssh_config_cmd_set(self, cmdlist, config_mode_command=None, prompt=""):
         """
 
-        :param cmdlist:
-        :param base_prompt:
+        :param config_mode_command:
+        :param cmdlist: iterable with multiple configuration commands
+        :param prompt:
         :return:
         """
+
+        if cmdlist is None:
+            return ''
+        elif isinstance(cmdlist, str):
+            cmdlist = (cmdlist,)
+
+        if not hasattr(cmdlist, '__iter__'):
+            raise ValueError("Invalid argument passed into ssh_config_cmd_set")
+
+        self.enable()
+        cfg_mode_args = (config_mode_command,) if config_mode_command else tuple()
+        self.config_mode(*cfg_mode_args)
+        if not prompt:
+            prompt = self.prompt
+
+        # Send config commands
+        action_list = []
+        for cmd in cmdlist:
+            action_list.append((cmd, prompt))
+
+        # Gather output
+        output = ''
+        try:
+            output = self.ssh_cmd_action(action_list)
+        except:
+            self.logger.error("SSHInteractive ssh_config_cmd_set: error running command set")
+            self.logger.debug("SSHInteractive ssh_config_cmd_set: error output {}".format(output))
+            raise
+
+        self.logger.debug("SSHInteractive ssh_config_cmd_set: output {}".format(output))
+
+        # exit configuration mode
+        self.exit_config_mode()
+
+        return output
 
 
     def ssh_parse_test(self, parselist):
@@ -222,13 +282,15 @@ class SSHInteractive(SshConnect):
         """
         parseresults = {}
         passed = True
+        command_outputs = ""
         for cmdr in parselist:
             self.logger.debug("SSHInteractive ssh_parse_test: Sending command {} to {}".format(cmdr, self.host))
             response = self.ssh_cmd_run(cmdr)
             self.logger.debug("SSHInteractive ssh_parse_test: " + self.host + " - Results of {}".format(response))
             self.logger.debug(
-                "SSHInteractive ssh_parse_test: " + self.host + " - Testng {} {}".format(response, parselist[cmdr]))
+                "SSHInteractive ssh_parse_test: " + self.host + " - Testing {} {}".format(response, parselist[cmdr]))
             parseresult = response
+            command_outputs += response
             if parselist[cmdr] is not None:
                 parseresult = commandparse(Configparse(response), parselist[cmdr])
                 self.logger.debug("SSHInteractive ssh_parse_test: result of testing: {}".format(str(parseresult)))
@@ -239,7 +301,7 @@ class SSHInteractive(SshConnect):
                                 self.host, result, cmdr))
                         passed = False
             parseresults[cmdr] = parseresult
-        return passed, parseresults
+        return passed, parseresults, command_outputs
 
     def set_base_prompt(self, pri_prompt_terminator='#',
                         alt_prompt_terminator='>', delay_factor=1):
@@ -260,7 +322,10 @@ class SSHInteractive(SshConnect):
         if not prompt[-1] in (pri_prompt_terminator, alt_prompt_terminator):
             raise ValueError("Router prompt not found: {0}".format(repr(prompt)))
         # Strip off trailing terminator
+        self.prompt = prompt
         self.base_prompt = prompt[:-1]
+        self.logger.debug(
+            "SSHInteractive: set_base_prompt: prompt: {}, base_prompt: {}".format(self.prompt, self.base_prompt))
         return self.base_prompt
 
     def find_prompt(self, delay_factor=1):
@@ -271,18 +336,18 @@ class SSHInteractive(SshConnect):
         self.send("\n")
         time.sleep(delay_factor * .1)
         prompt = self._channel.recv(9999)
+        prompt = prompt.decode().strip()
         # Check if the only thing you received was a newline
         count = 0
-        prompt = prompt.strip()
         while count <= 10 and not prompt:
-            prompt = self._channel.recv(9999).strip()
+            prompt = self._channel.recv(9999).decode().strip()
             if not prompt:
                 prompt = self._send("\n")
                 time.sleep(delay_factor * .1)
             count += 1
 
         # If multiple lines in the output take the last line
-        prompt = prompt.strip()
+        prompt = prompt.strip().splitlines()[-1]
         if not prompt:
             raise ValueError("Unable to find prompt: {}".format(prompt))
         return prompt
@@ -293,9 +358,9 @@ class SSHInteractive(SshConnect):
         :type check_string: str
         """
         self.send("\n")
-        output = self._channel.recv(9999).strip()
+        output = self._channel.recv(9999).decode().strip()
         if not output:
-            output = self._channel.recv(9999).strip()
+            output = self._channel.recv(9999).decode().strip()
         return check_string in output
 
     def enable(self, cmd='enable', pattern='ssword', re_flags=re.IGNORECASE):
@@ -312,16 +377,25 @@ class SSHInteractive(SshConnect):
               "the 'secret' argument to ConnectHandler."
         if not self.check_enable_mode():
             try:
-                combined_pattern = r"{}|{}".format(self.prompt + "#", pattern)
-                output = self.rpexpect(reguexp=combined_pattern)
+                combined_pattern = r"{}|{}".format(self.base_prompt + CISCO_PRIV_PROMPT, pattern)
+                output = self._send(cmd, tprompt=combined_pattern)
                 if pattern in output:
-                    output = self._send(self.enable_password, tprompt="{}#".format(self.prompt))
+                    if self.enable_password is None:
+                        self.enable_password = getpass.getpass("Enter enable password for " + self.username + " :  ")
+                    output = self._send(self.enable_password, tprompt="{}{}".format(self.base_prompt, CISCO_PRIV_PROMPT))
             except:
                 self.logger.error(msg)
-                raise ValueError(msg)
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                stacktrace = traceback.extract_tb(exc_traceback)
+                self.logger.debug(
+                    "SSHInteractive enable: receive message from device {}: {}".format(str(output), self.host))
+                self.logger.debug(sys.exc_info())
+                self.logger.debug(stacktrace)
+                raise
             if not self.check_enable_mode():
                 self.logger.error(msg)
                 raise ValueError(msg)
+        self.prompt = self.base_prompt + CISCO_PRIV_PROMPT
         return output
 
     def exit_enable_mode(self, exit_command='disable'):
@@ -329,30 +403,41 @@ class SSHInteractive(SshConnect):
         :param exit_command: Command that exits the session from privileged mode
         :type exit_command: str
         """
-        output = ""
+
+        output = ''
         if self.check_enable_mode():
-            self.write_channel(self.normalize_cmd(exit_command))
-            output += self.read_until_prompt()
+            output = self._send(exit_command, tprompt=r"{}{}".format(self.base_prompt, CISCO_BASE_PROMPT))
             if self.check_enable_mode():
+                self.logger.error("Failed to exit enable mode.")
+                self.logger.debug("SSHInteractive exit_enable_mode: received output {}".format(output))
                 raise ValueError("Failed to exit enable mode.")
+        self.prompt = self.base_prompt + CISCO_BASE_PROMPT
         return output
 
-    def check_config_mode(self, check_string='', pattern=''):
+    def check_config_mode(self, check_string=CISCO_CONFIG_PROMPT, pattern=''):
         """Checks if the device is in configuration mode or not.
         :param check_string: Identification of configuration mode from the device
         :type check_string: str
         :param pattern: Pattern to terminate reading of channel
         :type pattern: str
         """
-        self.write_channel(self.RETURN)
+        self.send("\n")
+        output = ''
         # You can encounter an issue here (on router name changes) prefer delay-based solution
         if not pattern:
-            output = self._read_channel_timing()
+            output = self._channel.recv(9999)
+            self.logger.debug(output)
+            output = output.decode().strip()
+            if not output:
+                output = self._channel.recv(9999).decode().strip()
         else:
-            output = self.read_until_pattern(pattern=pattern)
-        return check_string in output
+            output = self.rpexpect(pattern)
+        self.logger.debug("SSHInteractive check_config_mode: output {}".format(output))
+        if re.search(check_string, output):
+            return True
+        return False
 
-    def config_mode(self, config_command='', pattern=''):
+    def config_mode(self, config_command='config term', pattern=''):
         """Enter into config_mode.
         :param config_command: Configuration command to send to the device
         :type config_command: str
@@ -360,14 +445,28 @@ class SSHInteractive(SshConnect):
         :type pattern: str
         """
         output = ''
+        if not pattern:
+            pattern = CISCO_CONFIG_PROMPT
         if not self.check_config_mode():
-            self.write_channel(self.normalize_cmd(config_command))
-            output = self.read_until_pattern(pattern=pattern)
+            try:
+                output = self._send(config_command, tprompt=pattern)
+            except:
+                self.logger.error("SSHInteractive config_mode: Failed to enter config mode")
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                stacktrace = traceback.extract_tb(exc_traceback)
+                self.logger.debug(
+                    "SSHInteractive config mode: receive message from device {}".format(str(output)))
+                self.logger.debug(sys.exc_info())
+                self.logger.debug(stacktrace)
+                raise
             if not self.check_config_mode():
+                self.logger.debug(
+                    "SSHInteractive: config_mode: Failed to enter configuration mode: output {}".format(output))
                 raise ValueError("Failed to enter configuration mode.")
+        self.prompt = CISCO_CONFIG_PROMPT
         return output
 
-    def exit_config_mode(self, exit_config='', pattern=''):
+    def exit_config_mode(self, exit_config='end', pattern=CISCO_PRIV_PROMPT):
         """Exit from configuration mode.
         :param exit_config: Command to exit configuration mode
         :type exit_config: str
@@ -376,9 +475,20 @@ class SSHInteractive(SshConnect):
         """
         output = ''
         if self.check_config_mode():
-            self.write_channel(self.normalize_cmd(exit_config))
-            output = self.read_until_pattern(pattern=pattern)
+            try:
+                output = self._send(exit_config, tprompt="{}{}".format(self.base_prompt, pattern))
+                self.logger.debug("SSHInteractive exit_config_mode: output: {}".format(output))
+            except:
+                self.logger.error("SSHInteractive config_mode: Failed to exit config mode")
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                stacktrace = traceback.extract_tb(exc_traceback)
+                self.logger.debug(
+                    "SSHInteractive exit_config mode: receive message from device {}".format(str(output)))
+                self.logger.debug(sys.exc_info())
+                self.logger.debug(stacktrace)
+                raise
             if self.check_config_mode():
+                self.logger.error("Failed to exit configuration mode")
                 raise ValueError("Failed to exit configuration mode")
-        log.debug("exit_config_mode: {}".format(output))
+        self.prompt = self.base_prompt + CISCO_PRIV_PROMPT
         return output

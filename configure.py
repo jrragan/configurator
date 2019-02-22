@@ -12,8 +12,8 @@ from configure_threading import thread_this
 logger = logging.getLogger('configure')
 
 
-def configure_device(device, user="user", passwd="password", enable_passwd="enable", check_priv=True,
-                     checkdict={"show version": None}, actionlist=None):
+def configure_device(device, user="user", passwd="password", enable_passwd="enable", prompt=None, check_priv=True,
+                     checkdict={"show version": None}, actionlist=None, action_config=True, cfg_cmd_set=None):
     """
 
     :param device:
@@ -29,63 +29,60 @@ def configure_device(device, user="user", passwd="password", enable_passwd="enab
     device = device.strip()
     logger.info(device)
     logger.info("=" * 40)
-    # Set up prompts
-    if not device.lower().endswith(".example.com"):
-        preprompt = device
-        prompt = device.strip() + "#"
-        device = preprompt + ".example.com"
-    else:
-        preprompt = device.replace('example.com', '')
-        prompt = preprompt + "#"
-    logger.debug(prompt)
-    devob = SSHInteractive()
-    this_action_list = []
 
-    # Replace prompts in actionlist with actual device prompts
-    if actionlist is not None:
-        for command, prompt in actionlist:
-            this_action_list.append((command, preprompt + prompt))
-        logger.debug("New action list {}".format(this_action_list))
+    this_action_list = []
 
     # SSH
     try:
+        devob = SSHInteractive()
         logger.info('Making ssh connection to {}'.format(device))
-        devob.sshconnect(device, prompt, username=user, password=passwd, check_priv=check_priv,
+        devob.sshconnect(device, prompt=prompt, username=user, password=passwd, check_priv=check_priv,
                          enable_passwd=enable_passwd)
     except Exception as exc:
         logger.info("Exception encountered during SSH to device {}".format(device))
         logger.debug(exc)
         return device, None, exc
-    action_response, check_response, result = None, None, None
+    action_response, cmd_response, check_response, result, check_outputs = None, None, None, None, None
     if devob.sshconnected:
         try:
             if actionlist is not None:
                 logger.info("Action!!!!! for device {}".format(device))
-                action_response = devob.ssh_cmd_action(this_action_list)
+                action_response = devob.ssh_cmd_action(this_action_list, replace_prompt=True, config=action_config)
                 logger.debug("action responsed for {}: {}".format(device, action_response))
+            if cfg_cmd_set is not None:
+                logger.info("Config Set!!!!! for device {}".format(device))
+                cmd_response = devob.ssh_config_cmd_set(cfg_cmd_set)
+                logger.debug("action responsed for {}: {}".format(device, cmd_response))
             logger.info("Check!!!! for device {}".format(device))
-            passed, check_response = devob.ssh_parse_test(checkdict)
+            passed, check_response, check_outputs = devob.ssh_parse_test(checkdict)
             logger.info("Check response for {}: {}".format(device, check_response))
             result = device, True, check_response
             if not passed:
                 logger.info("{} has failed testing. ".format(device))
                 result = device, False, check_response
         except Exception as exc:
-            logger.info("Exception encountered while sending commands to device {}".format(device))
+            logger.error("Exception encountered while sending commands to device {}".format(device))
             logger.debug(exc)
-            return device, None, exc
+            message = exc
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            if "Invalid input detected at" in str(exc_value):
+                message = "exc: {}, Error on device: {}".format(exc, exc_value)
+            return device, None, message
     response_filename = device + time.strftime("_%y%m%d%H%M%S", time.gmtime()) + '.txt'
     try:
         with open(response_filename, 'wt') as logs:
             if actionlist is not None: logs.write(action_response)
-            logs.write("check_response: ".format(str(check_response)))
+            if cfg_cmd_set is not None: logs.write(cmd_response)
+            logs.write(check_outputs)
+            logs.write("\nResult: {}".format(result))
+
     except:
         exc_type, exc_value, exc_traceback = sys.exc_info()
         stacktrace = traceback.extract_tb(exc_traceback)
         logger.debug(sys.exc_info())
         logger.debug(stacktrace)
         logger.debug("For some reason the output file, " + response_filename + " for " + device + " cannot be created.")
-    logger.debug("result: ".format(result))
+    logger.debug("result: {}".format(result))
     return result
 
 
@@ -148,3 +145,8 @@ switch1##wr mem
     print("{} threads total time : {}".format(num_threads, time.time() - start))
 
     print(results)
+
+    print("The following devices failed:")
+    for device, result, cause in results:
+        if not result:
+            print("{}\t\t{}".format(device, cause))

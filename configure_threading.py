@@ -23,7 +23,7 @@ def wait_for(futures, timeout=None):
                 err = future.exception(timeout=timeout)
                 if err is None:
                     result = future.result(timeout=timeout)
-                    logger.debug("Result: ".format(result))
+                    logger.debug("Result: {}".format(result))
                     if result is None:
                         logger.error("Problem with result...")
                     results.append(result)
