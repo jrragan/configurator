@@ -61,7 +61,6 @@ class SSHInteractive(SshConnect):
         if self.check_priv:
             try:
                 self.enable()
-                self.prompt = self.prompt + CISCO_PRIV_PROMPT
             except:
                 self.logger.error("SSHInteractive look_for_prompt: failed to elevate to privileged mode")
                 exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -93,7 +92,6 @@ class SSHInteractive(SshConnect):
                 self.logger.debug(stacktrace)
                 self.close()
                 raise
-
 
     def _send(self, cmd, tprompt=None):
 
@@ -261,7 +259,6 @@ class SSHInteractive(SshConnect):
 
         return output
 
-
     def ssh_parse_test(self, parselist):
         """
         parselist is a dictionary of the form:
@@ -382,7 +379,8 @@ class SSHInteractive(SshConnect):
                 if pattern in output:
                     if self.enable_password is None:
                         self.enable_password = getpass.getpass("Enter enable password for " + self.username + " :  ")
-                    output = self._send(self.enable_password, tprompt="{}{}".format(self.base_prompt, CISCO_PRIV_PROMPT))
+                    output = self._send(self.enable_password,
+                                        tprompt="{}{}".format(self.base_prompt, CISCO_PRIV_PROMPT))
             except:
                 self.logger.error(msg)
                 exc_type, exc_value, exc_traceback = sys.exc_info()

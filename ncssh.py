@@ -69,7 +69,7 @@ class SshConnect(object):
     Sets Up SSH v2 Session 
     """
 
-    #----------------------------------------------------------------------
+    # ----------------------------------------------------------------------
     def __init__(self, host):
 
         """
@@ -89,7 +89,6 @@ class SshConnect(object):
         self._sshconnected = False
 
         self.known_hosts = None
-
 
     def sshconnect(self, port=22, timeout=None, unknown_host_cb='autoaddpolicy',
                    username=None, password=None, host_key_filename=None, key_filename=None, allow_agent=True,
@@ -177,13 +176,12 @@ class SshConnect(object):
         self.logger.debug("Connected to host " + self.host)
         self.logger.debug("Setting up channel to {}".format(self.host))
 
-        #The setup_channel method is abstract and Must be defined by a subclass
+        # The setup_channel method is abstract and Must be defined by a subclass
         self.setup_channel()
         if self._transport.is_active() and self._transport.is_authenticated():
             self._sshconnected = True
 
         socket.setdefaulttimeout(self.command_timeout + 30.0)
-
 
     def ssh_object(self):
         """
@@ -226,7 +224,7 @@ class SshConnect(object):
                 self.logger.debug("Attempting to load local_hosts keys file " + self.host)
                 self.ssh_client.load_host_keys(self.host_key_filename)
             except IOError:
-                #print "Unable to open host keys file"
+                # print "Unable to open host keys file"
                 self.logger.debug("Unable to open local host keys file for " + self.host)
                 keyfile = open(self.host_key_filename, 'w+')
                 keyfile.close()
@@ -235,7 +233,7 @@ class SshConnect(object):
                 except IOError:
                     self.logger.debug("Unable to create and load local_hosts keys file for " + self.host)
                     raise
-        #needed to compensate for a bug in some versions of paramiko
+        # needed to compensate for a bug in some versions of paramiko
         self.ssh_client.known_hosts = None
 
     def ssh_connect(self):
@@ -252,9 +250,9 @@ class SshConnect(object):
         try:
             self.logger.debug("Opening Connection to " + self.host)
             self.ssh_client.connect(self.host, port=self.port, timeout=self.timeout, username=self.username,
-                                        password=self.password,
-                                        key_filename=self.key_filename, allow_agent=self.allow_agent,
-                                        look_for_keys=self.look_for_keys)
+                                    password=self.password,
+                                    key_filename=self.key_filename, allow_agent=self.allow_agent,
+                                    look_for_keys=self.look_for_keys)
         except socket.gaierror:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             stacktrace = traceback.extract_tb(exc_traceback)
@@ -419,7 +417,7 @@ class SshConnect(object):
             start = time.time()
             self.logger.debug("rpexpect type 4 block: Beginning Loop. Buffer so far {}".format(buff))
             while not re.search(reguexp, buff.decode()):
-                #self.logger.debug("Code 4: Inside while loop in rpexpect in thread ")
+                # self.logger.debug("Code 4: Inside while loop in rpexpect in thread ")
                 try:
                     resp = self._channel.recv(9999)
                 except socket.timeout:
@@ -430,7 +428,7 @@ class SshConnect(object):
                         "Socket Timedout waiting for expected response {}.  Received response:  {}".format(reguexp,
                                                                                                            buff))
                 buff += resp
-                #self.logger.debug("Second buff check in thread {0}".format(buff))
+                # self.logger.debug("Second buff check in thread {0}".format(buff))
                 stend = time.time()
                 if stend - start < 5:
                     pass
@@ -460,7 +458,7 @@ class SshConnect(object):
             stend = time.time()
             while stend - start < looptimer:
                 time.sleep(1)
-                #self.logger.debug("Code 5: Inside while loop in rpexpect in thread ")
+                # self.logger.debug("Code 5: Inside while loop in rpexpect in thread ")
                 try:
                     resp = self._channel.recv(9999)
                 except socket.timeout:
@@ -479,7 +477,7 @@ class SshConnect(object):
                         "Detected server closed channel while waiting for expected response. Received response {}".format(
                             buff))
 
-                    #print buff
+                    # print buff
 
         self.logger.debug("rpexpect final block: Returning {}".format(buff))
         return buff.decode()
@@ -540,7 +538,6 @@ class SshConnect(object):
             self.logger.debug("transport is authenticated {} ".format(self._transport.is_authenticated()))
             self.logger.debug("exit status ready {} ".format(self._channel.exit_status_ready()))
         return self._sshconnected
-
 
     @property
     def command_timeout(self):
