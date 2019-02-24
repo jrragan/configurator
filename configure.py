@@ -9,6 +9,8 @@ import traceback
 from SSHInteractive import SSHInteractive
 from configure_threading import thread_this
 
+__version__ = '2019.02.22.1'
+
 logger = logging.getLogger('configure')
 
 

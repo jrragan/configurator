@@ -7,10 +7,10 @@ import time
 import traceback
 
 import nxos_XML_errors
-from command_parser import commandparse, Configparse
+from command_parser import commandparse, ConfigParse
 from ncssh import SshConnect
 
-__version__ = '2015.12.16.1'
+__version__ = '2019.02.22.1'
 
 logger = logging.getLogger('sshinteractive')
 
@@ -289,7 +289,7 @@ class SSHInteractive(SshConnect):
             parseresult = response
             command_outputs += response
             if parselist[cmdr] is not None:
-                parseresult = commandparse(Configparse(response), parselist[cmdr])
+                parseresult = commandparse(ConfigParse(response), parselist[cmdr])
                 self.logger.debug("SSHInteractive ssh_parse_test: result of testing: {}".format(str(parseresult)))
                 for result in parseresult.values():
                     if (False in result) or (None in result) or ('Error' in result):

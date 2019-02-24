@@ -1,11 +1,12 @@
-#!/usr/bin/env python2.6
 import logging
 import re
+
+__version__ = '2019.02.22.1'
 
 logger = logging.getLogger('command_parser')
 
 
-class Configparse(str):
+class ConfigParse(str):
     """
     Version 1.1
     3/4/2011
@@ -16,13 +17,13 @@ class Configparse(str):
         str.__init__(output)
 
     def exist(self, pat):
-##        print(self)
-##        print(pat)
+        # print(self)
+        # print(pat)
         if re.search(pat, self):
             return True
         else:
             return False
-    
+
     def existl(self, list_pat):
         self._result = []
         for pat in list_pat:
@@ -34,7 +35,7 @@ class Configparse(str):
             return False
         else:
             return True
-    
+
     def notexistl(self, list_pat):
         self._result = []
         for pat in list_pat:
@@ -43,7 +44,7 @@ class Configparse(str):
 
     def count(self, pat):
         return len(re.findall(pat, self))
-    
+
     def countl(self, list_pat):
         self._result = []
         for pat in list_pat:
@@ -65,10 +66,10 @@ class Configparse(str):
             return self._result
         except:
             return "Error:  Problem in the Pattern List"
-        
+
     def searchpat(self, pat):
         return re.search(pat, self)
-    
+
     def searchall(self, pat):
         return re.findall(pat, self)
 
@@ -88,15 +89,15 @@ def commandparse(output, pattern_dic):
     tuple of form (r'\((\d+) bytes free\)', '> 16000000').  The method should be given a list of tuples.
     Returns true if the expression evaluates to true.
     """
-    
-    #print pattern_dic
+
+    # print pattern_dic
     resultd = {}
     for flag in pattern_dic.keys():
         logger.debug("commandparse: flag: {}".format(flag))
         pat = pattern_dic[flag]
         logger.debug("commandparse: pattern: {}".format(pat))
-        #print flag
-        #print pat
+        # print flag
+        # print pat
         if flag == 'exist':
             result = output.exist(pat)
         elif flag == 'existl':
@@ -120,7 +121,7 @@ def commandparse(output, pattern_dic):
             nums = [j for i, j in pat]
             resultp = output.countl(pats)
             try:
-                result = map((lambda r, op : eval(str(float(r)) + op)), resultp, nums)
+                result = map((lambda r, op: eval(str(float(r)) + op)), resultp, nums)
             except:
                 result = ["Error in List or Regular Expression"]
         elif flag == 'countcmpnumzl':
@@ -129,7 +130,7 @@ def commandparse(output, pattern_dic):
             nums = [j for i, j in pat]
             resultp = output.countl(pats)
             try:
-                result = map((lambda r, op : eval(str(float(r)) + op) or r == 0), resultp, nums)
+                result = map((lambda r, op: eval(str(float(r)) + op) or r == 0), resultp, nums)
             except:
                 result = ["Error in List or Regular Expression"]
         elif flag == 'numcmpl':
@@ -140,7 +141,7 @@ def commandparse(output, pattern_dic):
             result = []
             pats = [i for i, k in pat]
             nums = [k for i, k in pat]
-            resultp = map((lambda pat : output.searchall(pat)), pats)
+            resultp = map((lambda pat: output.searchall(pat)), pats)
             fail = 0
             m = 0
             for rl in resultp:
@@ -154,6 +155,6 @@ def commandparse(output, pattern_dic):
                 else:
                     result.append(True)
         else:
-            result = "Error:  "  + flag + " =Unsupported Flag"
+            result = "Error:  " + flag + " =Unsupported Flag"
         resultd[flag] = result
-    return resultd        
+    return resultd

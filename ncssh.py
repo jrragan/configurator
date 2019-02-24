@@ -1,6 +1,6 @@
 import threading
 
-__version__ = '2015.12.16.1'
+__version__ = '2019.02.22.1'
 
 """
 4/5/14 - logging changes in rpexcept method

@@ -4,6 +4,8 @@ import multiprocessing
 import sys
 import traceback
 
+__version__ = '2019.02.22.1'
+
 logger = logging.getLogger('configure_threading')
 
 

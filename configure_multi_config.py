@@ -8,8 +8,6 @@ from configure_threading import thread_this
 
 logger = logging.getLogger('configure_multi_config')
 
-
-
 if __name__ == "__main__":
     LOGFILE = "multi_config" + time.strftime("_%y%m%d%H%M%S", time.gmtime()) + ".log"
     SCREENLOGLEVEL = logging.DEBUG

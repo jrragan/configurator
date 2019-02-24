@@ -3,9 +3,8 @@ import logging
 import multiprocessing
 import random
 import re
-import time
-
 import sys
+import time
 import traceback
 
 from SSHInteractive import SSHInteractive
@@ -64,7 +63,8 @@ def check_for_cable_errors(device, user="user", passwd="password", cmdlist1=[], 
             switches = get_switch_members(result_cmdlist1)
             errors = {}
             for switch in switches:
-                result_errors = devob.ssh_cmd_run('show platform port-asic 0 read register SifRacRwCrcErrorCnt switch ' + switch)
+                result_errors = devob.ssh_cmd_run(
+                    'show platform port-asic 0 read register SifRacRwCrcErrorCnt switch ' + switch)
                 errors[switch] = result_errors
                 logger.debug("device {} switch {} error result {}".format(device, switch, result_errors))
             result_cmdlist2 = devob.ssh_cmd_run(cmdlist2)
@@ -86,8 +86,8 @@ def check_for_cable_errors(device, user="user", passwd="password", cmdlist1=[], 
         stacktrace = traceback.extract_tb(exc_traceback)
         logger.error(sys.exc_info())
         logger.error(stacktrace)
-        logger.critical("For some reason the output file, " + response_filename + " for " + device + " cannot be created.")
-
+        logger.critical(
+            "For some reason the output file, " + response_filename + " for " + device + " cannot be created.")
 
 
 if __name__ == "__main__":
@@ -123,8 +123,9 @@ if __name__ == "__main__":
     cmd_list1 = ["show switch"]
     cmd_list2 = ["show clock", "show switch stack-ports", "show switch stack-ports summ"]
 
-    check_for_cable_errors_partial = functools.partial(check_for_cable_errors, user=username, passwd=password, cmdlist1=cmd_list1,
-                                           cmdlist2=cmd_list2)
+    check_for_cable_errors_partial = functools.partial(check_for_cable_errors, user=username, passwd=password,
+                                                       cmdlist1=cmd_list1,
+                                                       cmdlist2=cmd_list2)
     num_threads = min(len(devices), multiprocessing.cpu_count() * 4)
 
     start = time.time()
@@ -132,4 +133,3 @@ if __name__ == "__main__":
     print("{} threads total time : {}".format(num_threads, time.time() - start))
 
     print(results)
-
