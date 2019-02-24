@@ -52,11 +52,12 @@ def configure_device(device, user=None, passwd=None, enable_passwd=None, prompt=
         try:
             if actionlist is not None:
                 logger.info("Action!!!!! for device {}".format(device))
-                action_response = devob.ssh_cmd_action(this_action_list, replace_prompt=True, config=action_config)
+                action_response = devob.ssh_cmd_action(this_action_list, replace_prompt=True, config=action_config,
+                                                       stop_on_error=True)
                 logger.debug("action responsed for {}: {}".format(device, action_response))
             if cfg_cmd_set is not None:
                 logger.info("Config Set!!!!! for device {}".format(device))
-                cmd_response = devob.ssh_config_cmd_set(cfg_cmd_set)
+                cmd_response = devob.ssh_config_cmd_set(cfg_cmd_set, stop_on_error=True)
                 logger.debug("action responsed for {}: {}".format(device, cmd_response))
             logger.info("Check!!!! for device {}".format(device))
             passed, check_response, check_outputs = devob.ssh_parse_test(checkdict)
