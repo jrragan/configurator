@@ -139,7 +139,7 @@ switch1##wr mem
     username = 'username'
     password = 'password'
 
-    change_mac_partial = functools.partial(configure_device(), user=username, passwd=password, checkdict=checkdict,
+    change_mac_partial = functools.partial(configure_device, user=username, passwd=password, checkdict=checkdict,
                                            actionlist=actionlist)
     num_threads = min(len(devices), multiprocessing.cpu_count() * 4)
 
