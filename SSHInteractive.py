@@ -198,7 +198,7 @@ class SSHInteractive(SshConnect):
         self.logger.debug("SSHInteractive ssh_cmd_run: Sending response {}".format(buff))
         return buff
 
-    def ssh_cmd_action(self, cmdlist, replace_prompt=False, config=True, stop_on_error=False, save_config=True,
+    def ssh_cmd_action(self, cmdlist, replace_prompt=False, config=True, stop_on_error=False, save_config=False,
                        prompt=""):
         this_action_list = []
         if replace_prompt and config:
