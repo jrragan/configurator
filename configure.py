@@ -12,10 +12,13 @@ from configure_threading import thread_this
 logger = logging.getLogger('configure')
 
 
-def configure_device(device, user=None, passwd=None, enable_passwd="enable", prompt=None, check_priv=True,
+def configure_device(device, user=None, passwd=None, enable_passwd=None, prompt=None, check_priv=True,
                      checkdict={"show version": None}, actionlist=None, action_config=True, cfg_cmd_set=None):
     """
 
+    :param prompt:
+    :param cfg_cmd_set:
+    :param action_config:
     :param device:
     :param user:
     :param passwd:
