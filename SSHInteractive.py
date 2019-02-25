@@ -10,7 +10,7 @@ import nxos_XML_errors
 from command_parser import commandparse, ConfigParse
 from ncssh import SshConnect
 
-__version__ = '2019.02.23.1'
+__version__ = '2019.02.24.1'
 
 logger = logging.getLogger('sshinteractive')
 
