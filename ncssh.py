@@ -1,6 +1,7 @@
+import io
 import threading
 
-__version__ = '2019.02.22.1'
+__version__ = '2019.02.25.1'
 
 """
 4/5/14 - logging changes in rpexcept method
@@ -92,7 +93,7 @@ class SshConnect(object):
 
     def sshconnect(self, port=22, timeout=None, unknown_host_cb='autoaddpolicy',
                    username=None, password=None, host_key_filename=None, key_filename=None, allow_agent=True,
-                   look_for_keys=False, command_timeout=30, **kwargs):
+                   look_for_keys=False, command_timeout=30, log_session_file=None, log_file_mode='w', **kwargs):
         """
         Connect via SSH and initialize a session. First attempts the publickey
         authentication method and then password authentication.
@@ -168,6 +169,10 @@ class SshConnect(object):
             self.password = getpass.getpass("Enter password for " + self.username + " :  ")
 
         self.logger.debug("Creating SSH connection to " + self.host)
+
+        self.session_log = None
+        if log_session_file is not None:
+            self.open_session_log(log_session_file, log_file_mode)
 
         self.ssh_object()
         self.logger.debug("SSH object instantiated")
@@ -339,7 +344,7 @@ class SshConnect(object):
             raise
 
     @checkconnection
-    def rpexpect(self, reguexp, code=4, characters=20):
+    def rpexpect(self, reguexp, code=4, characters=20, timer=None, bytes=9999):
         """
 
         Method to provide expect-like functionality
@@ -355,7 +360,7 @@ class SshConnect(object):
 
         -    code = 5:  collect characters from channel until timeout is reached
 
-        reguexp:    string representing the delimeter to look for in the channel
+        reguexp:    string representing the delimiter to look for in the channel
 
         Looks for the delimeter and returns the preceding string from the socket
 
@@ -386,10 +391,13 @@ class SshConnect(object):
         paramiko_timeout = self._channel.gettimeout()
         self.logger.debug(
             "rpexpect first block: Socket timeout is {0}, {1}".format(str(socket_timeout), str(paramiko_timeout)))
-        looptimer = self.command_timeout
+        if timer is None:
+            looptimer = self.command_timeout
+        else:
+            looptimer = timer
         try:
             self.logger.debug("rpexpect first block: Checking buffer for {}".format(reguexp))
-            buff = self._channel.recv(9999)
+            buff = self.recv(bytes)
             self.logger.debug(
                 "rpexpect first block: First buff check in thread {0}, {1}".format(
                     str(threading.currentThread().getName()), str(buff)))
@@ -419,7 +427,7 @@ class SshConnect(object):
             while not re.search(reguexp, buff.decode()):
                 # self.logger.debug("Code 4: Inside while loop in rpexpect in thread ")
                 try:
-                    resp = self._channel.recv(9999)
+                    resp = self.recv(bytes)
                 except socket.timeout:
                     self.logger.error(
                         "rpexpect type 4 block: Timedout waiting for intial response.  Received response:  {0}".format(
@@ -433,7 +441,7 @@ class SshConnect(object):
                 if stend - start < 5:
                     pass
                 elif stend - start < looptimer:
-                    time.sleep(1)
+                    time.sleep(.1)
                     pass
                 else:
                     self.logger.error(
@@ -457,10 +465,10 @@ class SshConnect(object):
             start = time.time()
             stend = time.time()
             while stend - start < looptimer:
-                time.sleep(1)
+                time.sleep(.1)
                 # self.logger.debug("Code 5: Inside while loop in rpexpect in thread ")
                 try:
-                    resp = self._channel.recv(9999)
+                    resp = self.recv(bytes)
                 except socket.timeout:
                     self.logger.error(
                         "rpexpect type 5 block: Timed out waiting for intial response.  Received response:  {0}".format(
@@ -477,10 +485,16 @@ class SshConnect(object):
                         "Detected server closed channel while waiting for expected response. Received response {}".format(
                             buff))
 
-                    # print buff
+                stend = time.time()
 
         self.logger.debug("rpexpect final block: Returning {}".format(buff))
         return buff.decode()
+
+    def recv(self, bytes):
+        buffer = self._channel.recv(bytes)
+        if self.session_log:
+            self.session_log.write(buffer.decode())
+        return buffer
 
     @checkconnection
     def send(self, message):
@@ -514,6 +528,8 @@ class SshConnect(object):
         if self._transport.is_active():
             self._transport.close()
         self._sshconnected = False
+        if self.session_log is not None:
+            self.close_session_log()
 
     @property
     def sshconnected(self):
@@ -558,3 +574,36 @@ class SshConnect(object):
         """
         assert isinstance(command_timeout, float) or isinstance(command_timeout, int)
         self._command_timeout = command_timeout
+
+    def open_session_log(self, log_session_file, log_file_mode):
+        if isinstance(log_session_file, str):
+            try:
+                # If session_log is a string, open a file corresponding to string name.
+                if log_file_mode == "append" or log_file_mode == "a":
+                    self.session_log = open(log_session_file, mode="a")
+                else:
+                    self.session_log = open(log_file_mode, mode="w")
+                self._session_log_close = True
+            except:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                stacktrace = traceback.extract_tb(exc_traceback)
+                self.logger.debug(sys.exc_info())
+                self.logger.debug(stacktrace)
+                self.logger.warning(
+                    "For some reason the session log output file, " + log_session_file + " for " + self.host + " cannot be created or opened.")
+                self.session_log = None
+        elif isinstance(log_session_file, io.BufferedIOBase):
+            # In-memory buffer or an already open file handle
+            self.session_log = log_session_file
+        else:
+            self.logger.warning(
+                "session_log must be a path to a file, a file handle, "
+                "or a BufferedIOBase subclass."
+            )
+            self.session_log = None
+
+    def close_session_log(self):
+        """Close the session_log file (if it is a file that we opened)."""
+        if self.session_log is not None and self._session_log_close:
+            self.session_log.close()
+        self.session_log = None

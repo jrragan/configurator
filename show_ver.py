@@ -2,12 +2,10 @@ import functools
 import logging
 import multiprocessing
 import random
-import time
-
-import sys
-import traceback
-
 import re
+import sys
+import time
+import traceback
 
 from SSHInteractive import SSHInteractive
 from configure_threading import thread_this
@@ -40,7 +38,7 @@ def simple_configure(device, prompt=None, user="user", passwd="password", checkd
     else:
         preprompt = ''
     logger.debug(prompt)
-    devob = SSHInteractive(device, prompt)
+    devob = SSHInteractive()
     this_action_list = []
 
     #Replace prompts in actionlist with actual device prompts
@@ -50,9 +48,10 @@ def simple_configure(device, prompt=None, user="user", passwd="password", checkd
         logger.debug("New action list {}".format(this_action_list))
 
     #SSH
+    action_response = check_response = result = None
     try:
         logger.info('Making ssh connection to {}'.format(device))
-        devob.sshconnect(username=user, password=passwd)
+        devob.sshconnect(device, username=user, password=passwd)
     except Exception as exc:
         logger.info("Exception encountered during SSH to device {}".format(device))
         logger.debug(exc)

@@ -4,7 +4,6 @@ import multiprocessing
 import random
 import sys
 import time
-import traceback
 
 from SSHInteractive import SSHInteractive
 from configure_threading import thread_this
@@ -15,7 +14,8 @@ logger = logging.getLogger('configure')
 
 
 def configure_device(device, user=None, passwd=None, enable_passwd=None, prompt=None, check_priv=True,
-                     checkdict={"show version": None}, actionlist=None, action_config=True, cfg_cmd_set=None):
+                     checkdict={"show version": None}, actionlist=None, action_config=True, cfg_cmd_set=None,
+                     log_session_output=True, log_filename=None):
     """
 
     :param prompt:
@@ -37,15 +37,24 @@ def configure_device(device, user=None, passwd=None, enable_passwd=None, prompt=
 
     this_action_list = []
 
+    response_filename = None
+    if log_session_output:
+        if log_filename is not None:
+            response_filename = log_filename
+        else:
+            response_filename = device + time.strftime("_%y%m%d%H%M%S", time.gmtime()) + '.txt'
+
     # SSH
+    devob = None
     try:
         devob = SSHInteractive()
         logger.info('Making ssh connection to {}'.format(device))
         devob.sshconnect(device, prompt=prompt, username=user, password=passwd, check_priv=check_priv,
-                         enable_passwd=enable_passwd)
+                         enable_passwd=enable_passwd, log_session_file=response_filename)
     except Exception as exc:
         logger.info("Exception encountered during SSH to device {}".format(device))
         logger.debug(exc)
+        devob.close()
         return device, None, exc
     action_response, cmd_response, check_response, result, check_outputs = None, None, None, None, None
     if devob.sshconnected:
@@ -73,22 +82,12 @@ def configure_device(device, user=None, passwd=None, enable_passwd=None, prompt=
             exc_type, exc_value, exc_traceback = sys.exc_info()
             if "Invalid input detected at" in str(exc_value):
                 message = "exc: {}, Error on device: {}".format(exc, exc_value)
+            devob.close()
             return device, None, message
-    response_filename = device + time.strftime("_%y%m%d%H%M%S", time.gmtime()) + '.txt'
-    try:
-        with open(response_filename, 'wt') as logs:
-            if actionlist is not None: logs.write(action_response)
-            if cfg_cmd_set is not None: logs.write(cmd_response)
-            logs.write(check_outputs)
-            logs.write("\nResult: {}".format(result))
 
-    except:
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        stacktrace = traceback.extract_tb(exc_traceback)
-        logger.debug(sys.exc_info())
-        logger.debug(stacktrace)
-        logger.debug("For some reason the output file, " + response_filename + " for " + device + " cannot be created.")
     logger.debug("result: {}".format(result))
+    devob.close()
+
     return result
 
 

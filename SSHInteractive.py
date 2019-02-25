@@ -3,14 +3,13 @@ import logging
 import re
 import socket
 import sys
-import time
 import traceback
 
 import nxos_XML_errors
 from command_parser import commandparse, ConfigParse
 from ncssh import SshConnect
 
-__version__ = '2019.02.24.1'
+__version__ = '2019.02.25.1'
 
 logger = logging.getLogger('sshinteractive')
 
@@ -34,23 +33,22 @@ class SSHInteractive(SshConnect):
 
         This is only possible by ssh'ing to the cli, running the switchto vdc command and then dropping into the xml subsystem
 
-        @param host: str
-        @param prompt: str, need a prompt so we can detect when a cli command has finished running
-        :type check_enable: bool
-        @param check_enable: if True and device is not in priv mode, attempt to put in privilege mode
+
 
         """
         self.logger = logging.getLogger('SSHInteractive.SSHInteractive')
         self.logger.debug("Instantiating SSH object")
 
     def sshconnect(self, host, *args, prompt=None, username=None, password=None, type='Cisco', check_priv=True,
-                   enable_password=None, **kwargs):
+                   enable_password=None, command_timeout=10, log_session_file=None, log_file_mode='w', **kwargs):
         super().__init__(host)
         self.type = type
         self.prompt = prompt
         self.check_priv = check_priv
         self.enable_password = enable_password
-        super().sshconnect(*args, username=username, password=password, **kwargs)
+        super().sshconnect(*args, username=username, password=password,
+                           command_timeout=command_timeout, log_session_file=log_session_file,
+                           log_file_mode=log_file_mode, **kwargs)
 
     # SSH object requires that the subclass define the object
     def setup_channel(self):
@@ -169,7 +167,7 @@ class SSHInteractive(SshConnect):
             if 'Invalid input detected' in response:
                 self.logger.error(
                     "SSHInteractive Send: Invalid Input detected on :  " + self.host + " while running :  " + cmd + "  Output:  " + response + "\n")
-            if re.search(r"%\s*Error"):
+            if re.search(r"%\s*Error", response) or re.search(r"%\s*Invalid", response):
                 self.logger.error(
                     "SSHInteractive Send: %Error detected on :  " + self.host + " while running :  " + cmd + "  Output:  " + response + "\n")
         return response
@@ -316,10 +314,13 @@ class SSHInteractive(SshConnect):
                         self.logger.debug("SSHInteractive ssh_parse_test: command output: {}".format(response))
                         passed = False
             parseresults[cmdr] = parseresult
+        if self.session_log:
+            self.session_log.write("Test Result = {}\n".format(passed))
+            self.session_log.write("Test Results: {}".format(parseresults))
         return passed, parseresults, command_outputs
 
     def set_base_prompt(self, pri_prompt_terminator='#',
-                        alt_prompt_terminator='>', delay_factor=1):
+                        alt_prompt_terminator='>'):
         """Sets self.base_prompt
         Used as delimiter for stripping of trailing prompt in output.
         Should be set to something that is general and applies in multiple contexts. For Cisco
@@ -330,10 +331,8 @@ class SSHInteractive(SshConnect):
         :type pri_prompt_terminator: str
         :param alt_prompt_terminator: Alternate trailing delimiter for identifying a device prompt
         :type alt_prompt_terminator: str
-        :param delay_factor: See __init__: global_delay_factor
-        :type delay_factor: int
         """
-        prompt = self.find_prompt(delay_factor=delay_factor)
+        prompt = self.find_prompt()
         if not prompt[-1] in (pri_prompt_terminator, alt_prompt_terminator):
             raise ValueError("Router prompt not found: {0}".format(repr(prompt)))
         # Strip off trailing terminator
@@ -343,23 +342,13 @@ class SSHInteractive(SshConnect):
             "SSHInteractive: set_base_prompt: prompt: {}, base_prompt: {}".format(self.prompt, self.base_prompt))
         return self.base_prompt
 
-    def find_prompt(self, delay_factor=1):
+    def find_prompt(self):
         """Finds the current network device prompt, last line only.
-        :param delay_factor: See __init__: global_delay_factor
-        :type delay_factor: int
         """
         self.send("\n")
-        time.sleep(delay_factor * .1)
-        prompt = self._channel.recv(9999)
-        prompt = prompt.decode().strip()
+        prompt = self.rpexpect('', code=5, timer=1.5)
+        prompt = prompt.strip()
         # Check if the only thing you received was a newline
-        count = 0
-        while count <= 10 and not prompt:
-            prompt = self._channel.recv(9999).decode().strip()
-            if not prompt:
-                prompt = self._send("\n")
-                time.sleep(delay_factor * .1)
-            count += 1
 
         # If multiple lines in the output take the last line
         prompt = prompt.strip().splitlines()[-1]
@@ -525,6 +514,8 @@ class SSHInteractive(SshConnect):
             pat=CISCO_COPY_CONFIG_SAVE_PATTERN,
             verification=r"\[OK\]"):
         """Saves Config."""
+
+        output = ''
         self.enable()
         pat = "{}|{}".format(pat, self.prompt)
         try:
