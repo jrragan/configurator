@@ -522,11 +522,11 @@ class SSHInteractive(SshConnect):
     def save_config(
             self,
             cmd="copy running-config startup-config",
-            pat=r"{}|{}".format(CISCO_COPY_CONFIG_SAVE_PATTERN),
+            pat=CISCO_COPY_CONFIG_SAVE_PATTERN,
             verification=r"\[OK\]"):
         """Saves Config."""
         self.enable()
-        pat = pat.format(self.prompt)
+        pat = "{}|{}".format(pat, self.prompt)
         try:
             output = self._send(cmd, tprompt=pat)
             if re.search(CISCO_COPY_CONFIG_SAVE_PATTERN, output):
