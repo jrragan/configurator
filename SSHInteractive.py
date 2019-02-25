@@ -223,6 +223,7 @@ class SSHInteractive(SshConnect):
                     self.logger.debug("SSHInteractive ssh_cmd_action: Response " + response)
                     raise ValueError("Error Sending " + cmd + " on " + self.host + ": command output " + response)
             if save_config:
+                self.exit_config_mode()
                 self.save_config()
         except:
             raise
