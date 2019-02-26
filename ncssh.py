@@ -171,7 +171,9 @@ class SshConnect(object):
         self.logger.debug("Creating SSH connection to " + self.host)
 
         self.session_log = None
+        self.logger.debug("SSHConnect: Checking for session file.")
         if log_session_file is not None:
+            self.logger.debug("SSHConnect: log_session_file: {}".format(log_session_file))
             self.open_session_log(log_session_file, log_file_mode)
 
         self.ssh_object()
@@ -385,16 +387,20 @@ class SshConnect(object):
         """
 
         buff = ''
+
+        if timer is None:
+            looptimer = self.command_timeout
+        else:
+            looptimer = timer
         self.logger.debug("rpexpect first block: Timeout is configured as {0}".format(str(self.command_timeout)))
         socket_timeout = socket.getdefaulttimeout()
         self._channel.settimeout(self.command_timeout)
         paramiko_timeout = self._channel.gettimeout()
         self.logger.debug(
             "rpexpect first block: Socket timeout is {0}, {1}".format(str(socket_timeout), str(paramiko_timeout)))
-        if timer is None:
-            looptimer = self.command_timeout
-        else:
-            looptimer = timer
+        self.logger.debug(
+            "rpexpect first block: looptimer is {}".format(looptimer)
+        )
         try:
             self.logger.debug("rpexpect first block: Checking buffer for {}".format(reguexp))
             buff = self.recv(bytes)
@@ -464,6 +470,12 @@ class SshConnect(object):
             self.logger.debug("rpexpect type 5 block: Starting Type 5 Processing. Beginning Loop. ")
             start = time.time()
             stend = time.time()
+            self.logger.debug("rpexpect type 5 block: Timeout is configured as {0}".format(str(self.command_timeout)))
+            self.logger.debug(
+                "rpexpect type 5 block: Socket timeout is {0}, {1}".format(str(socket_timeout), str(paramiko_timeout)))
+            self.logger.debug(
+                "rpexpect type 5 block: looptimer is {}".format(looptimer)
+            )
             while stend - start < looptimer:
                 time.sleep(.1)
                 # self.logger.debug("Code 5: Inside while loop in rpexpect in thread ")
@@ -473,8 +485,12 @@ class SshConnect(object):
                     self.logger.error(
                         "rpexpect type 5 block: Timed out waiting for intial response.  Received response:  {0}".format(
                             buff))
-                    raise TimeoutExpiredError(
-                        "Socket Timed out waiting for expected response.  Received response:  {0}".format(buff))
+                    self.logger.debug(
+                        "rpexpect: type 5 block: loop: stend - start: {}".format(stend - start)
+                    )
+                    self.logger.debug(
+                        "rpexpect: type 5 block: Socket Timed out waiting for response.  Received response:  {0}".format(
+                            buff))
                 buff += resp
                 if self._channel.exit_status_ready():
                     self.logger.error(
@@ -493,6 +509,7 @@ class SshConnect(object):
     def recv(self, bytes):
         buffer = self._channel.recv(bytes)
         if self.session_log:
+            self.logger.debug("recv: writing to session file: {}".format(self.session_log))
             self.session_log.write(buffer.decode())
         return buffer
 
@@ -576,13 +593,14 @@ class SshConnect(object):
         self._command_timeout = command_timeout
 
     def open_session_log(self, log_session_file, log_file_mode):
+        self.logger.info("ncssh: open_session_log: filename: {}, filemode: {}".format(log_session_file, log_file_mode))
         if isinstance(log_session_file, str):
             try:
                 # If session_log is a string, open a file corresponding to string name.
                 if log_file_mode == "append" or log_file_mode == "a":
                     self.session_log = open(log_session_file, mode="a")
                 else:
-                    self.session_log = open(log_file_mode, mode="w")
+                    self.session_log = open(log_session_file, mode="w")
                 self._session_log_close = True
             except:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
@@ -590,7 +608,7 @@ class SshConnect(object):
                 self.logger.debug(sys.exc_info())
                 self.logger.debug(stacktrace)
                 self.logger.warning(
-                    "For some reason the session log output file, " + log_session_file + " for " + self.host + " cannot be created or opened.")
+                    "ncssh: open_session_log: For some reason the session log output file, " + log_session_file + " for " + self.host + " cannot be created or opened.")
                 self.session_log = None
         elif isinstance(log_session_file, io.BufferedIOBase):
             # In-memory buffer or an already open file handle
@@ -601,6 +619,7 @@ class SshConnect(object):
                 "or a BufferedIOBase subclass."
             )
             self.session_log = None
+        self.logger.info("ncssh: open_session_log: file: {}".format(self.session_log))
 
     def close_session_log(self):
         """Close the session_log file (if it is a file that we opened)."""
