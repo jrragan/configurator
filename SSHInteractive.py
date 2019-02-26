@@ -9,7 +9,7 @@ import nxos_XML_errors
 from command_parser import commandparse, ConfigParse
 from ncssh import SshConnect
 
-__version__ = '2019.02.25.1'
+__version__ = '2019.02.25.2'
 
 logger = logging.getLogger('sshinteractive')
 
@@ -356,20 +356,14 @@ class SSHInteractive(SshConnect):
             raise ValueError("Unable to find prompt: {}".format(prompt))
         return prompt
 
-    def check_enable_mode(self, check_string=CISCO_PRIV_PROMPT):
+    def check_enable_mode(self, check_string=CISCO_PRIV_PROMPT, pattern=''):
         """Check if in enable mode. Return boolean.
+        :param pattern:
         :param check_string: Identification of privilege mode from device
         :type check_string: str
         """
-        output = ''
-        try:
-            output = self._send("\n",
-                                tprompt=r"{}|{}|{}".format(self.base_prompt, CISCO_BASE_PROMPT, CISCO_PRIV_PROMPT))
-        except:
-            self.logger.error("SSHInteractive check_enable_mode: Error attempting to check configuration mode")
-            self.logger.debug("SSHInteractive check_enable_mode: output {}".format(output))
-            raise
-        return check_string in output
+        self.logger.info("Checking enable mode on device {}".format(self.host))
+        return self._check_mode(check_string=check_string, pattern=pattern)
 
     def enable(self, cmd='enable', pattern='ssword', re_flags=re.IGNORECASE):
         """Enter enable mode.
@@ -436,17 +430,24 @@ class SSHInteractive(SshConnect):
         :type pattern: str
         """
 
+        self.logger.info("Checking config mode on device {}".format(self.host))
+        return self._check_mode(check_string=check_string, pattern=pattern)
+
+    def _check_mode(self, check_string=CISCO_CONFIG_PROMPT, pattern='', prompt_pattern=None):
+
+        if prompt_pattern is None:
+            r"{}|{}|{}".format(self.base_prompt, CISCO_BASE_PROMPT, CISCO_PRIV_PROMPT)
         output = ''
         try:
             if not pattern:
                 output = self._send("\n",
-                                    tprompt=r"{}|{}|{}".format(self.base_prompt, CISCO_BASE_PROMPT, CISCO_PRIV_PROMPT))
+                                    tprompt=prompt_pattern)
             else:
                 output = self._send("\n", tprompt=pattern)
-            self.logger.debug("SSHInteractive check_config_mode: output {}".format(output))
+            self.logger.debug("SSHInteractive check__mode: output {}".format(output))
         except:
-            self.logger.error("SSHInteractive check_config_mode: Error attempting to check configuration mode")
-            self.logger.debug("SSHInteractive check_config_mode: output {}".format(output))
+            self.logger.error("SSHInteractive check__mode: Error attempting to check configuration mode")
+            self.logger.debug("SSHInteractive check__mode: output {}".format(output))
             raise
         if re.search(check_string, output):
             return True
