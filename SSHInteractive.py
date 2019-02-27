@@ -9,7 +9,7 @@ import nxos_XML_errors
 from command_parser import commandparse, ConfigParse
 from ncssh import SshConnect
 
-__version__ = '2019.02.25.2'
+__version__ = '2019.02.27.1'
 
 logger = logging.getLogger('sshinteractive')
 
@@ -203,17 +203,36 @@ class SSHInteractive(SshConnect):
         self.logger.debug("SSHInteractive ssh_cmd_run: Sending response {}".format(buff))
         return buff
 
-    def ssh_cmd_action(self, cmdlist, replace_prompt=False, config=True, stop_on_error=False, save_config=False,
+    def ssh_cmd_action(self, cmdlist, replace_prompt=False, config=True, config_mode_command=None, stop_on_error=False,
+                       save_config=False,
                        prompt=""):
+        """
+
+        Takes a list of (cmd, pattern) tuples and runs the commands on the device
+
+        :param config_mode_command: command for entering config mode, default is config term
+        :param cmdlist: list of (cmd, pattern) pairs
+        :param replace_prompt: if True, replace the pattern in the cmdlist with expected device prompt
+        :param config: boolean, True if these are configuration commands
+        :param stop_on_error: boolean, if True stop running more commands if an error is detected on the device, rais
+        a ValueError
+        :param save_config: boolean, save the configurtion if True
+        :param prompt: alternative prompt to search for, used with the replace_prompt flag
+        :return:
+        """
 
         self.logger.info("SSHInteractive: ssh_cmd_action: {}".format(self.host))
         this_action_list = []
-        if replace_prompt and config:
-            for command, prompt in cmdlist:
-                this_action_list.append((command, CISCO_CONFIG_PROMPT))
-        elif replace_prompt:
-            for command, prompt in cmdlist:
-                this_action_list.append((command, self.base_prompt + prompt))
+        if config:
+            self.enable()
+            cfg_mode_args = (config_mode_command,) if config_mode_command else tuple()
+            self.config_mode(*cfg_mode_args)
+        if replace_prompt:
+            for command, prompt_pat in cmdlist:
+                if prompt:
+                    this_action_list.append((command, self.base_prompt + prompt))
+                else:
+                    this_action_list.append((command, self.prompt))
             logger.debug("SSHInteractive: ssh_cmd_action: New action list {}".format(this_action_list))
         self.logger.debug("SSHInteractive ssh_cmd_action: action list: {}".format(cmdlist))
         buff = ''
@@ -228,6 +247,7 @@ class SSHInteractive(SshConnect):
                 if stop_on_error and (re.search(r"%\s*Invalid", response) or re.search(r"%\s*Error", response)):
                     self.logger.error("SSHInteractive ssh_cmd_action: Error Sending " + cmd + " on " + self.host)
                     self.logger.debug("SSHInteractive ssh_cmd_action: Response " + response)
+                    self.exit_config_mode()
                     raise ValueError(
                         "SSHInteractive: ssh_cmd_action: Error Sending " + cmd + " on " + self.host + ": command output " + response)
             if save_config:
@@ -240,10 +260,17 @@ class SSHInteractive(SshConnect):
 
     def ssh_config_cmd_set(self, cmdlist, config_mode_command=None, stop_on_error=False, save_config=True, prompt=""):
         """
+        Takes a  list of commands, automatically enters configuration mode,
+        converts the command list to the [(command1, prompt), ...] form,
+        calls the ssh_cmd_action method with this new list,
+        after running the commands, automatically exits config mode
 
-        :param config_mode_command:
+        :param save_config: boolean, if True, save the configuration
+        :param stop_on_error: boolean, if True do not enter more commands if the current command generated an error
+        on the device, raises a ValueError
+        :param config_mode_command: command for entering config mode, default is "config t"
         :param cmdlist: iterable with multiple configuration commands
-        :param prompt:
+        :param prompt: alternative pattern to previously provided or discovered prompts
         :return:
         """
         self.logger.info("SSHInteractive: ssh_config_cmd_set: {}".format(self.host))
@@ -255,21 +282,16 @@ class SSHInteractive(SshConnect):
         if not hasattr(cmdlist, '__iter__'):
             raise ValueError("SSHInteractive: ssh_config_cmd_set: Invalid argument passed into ssh_config_cmd_set")
 
-        self.enable()
-        cfg_mode_args = (config_mode_command,) if config_mode_command else tuple()
-        self.config_mode(*cfg_mode_args)
-        if not prompt:
-            prompt = self.prompt
-
         # Send config commands
         action_list = []
         for cmd in cmdlist:
-            action_list.append((cmd, prompt))
+            action_list.append((cmd, "",))
 
         # Gather output
         output = ''
         try:
-            output = self.ssh_cmd_action(action_list, stop_on_error=stop_on_error, save_config=save_config)
+            output = self.ssh_cmd_action(action_list, config_mode_command=config_mode_command, replace_prompt=True,
+                                         stop_on_error=stop_on_error, save_config=save_config)
         except:
             self.logger.error("SSHInteractive ssh_config_cmd_set: error running command set")
             self.logger.debug("SSHInteractive ssh_config_cmd_set: error output {}".format(output))
@@ -278,8 +300,6 @@ class SSHInteractive(SshConnect):
         self.logger.debug("SSHInteractive ssh_config_cmd_set: output {}".format(output))
 
         # exit configuration mode
-        self.exit_config_mode()
-
         return output
 
     def ssh_parse_test(self, parselist):

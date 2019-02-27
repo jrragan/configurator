@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     logger.critical("Started")
 
-    stores = [('st1111', '172.16.1.119'), ('st2222', '172.16.1.120')]
+    stores = [('st1111', '172.16.1.129'), ('st2222', '172.16.1.130')]
     checkdict = {'show run | in snmp': {
         'existl': [r'snmp-server trap-source GigabitEthernet1', r'snmp-server community public RO',
                    r'snmp-server host 10.10.10.10 vrf mgmt public', 'snmp-server host 11.11.11.11 vrf mgmt public',

@@ -1,7 +1,7 @@
 import io
 import threading
 
-__version__ = '2019.02.25.1'
+__version__ = '2019.02.27.1'
 
 """
 4/5/14 - logging changes in rpexcept method
@@ -387,7 +387,7 @@ class SshConnect(object):
         """
 
         buff = ''
-
+        resp = ''
         if timer is None:
             looptimer = self.command_timeout
         else:
@@ -479,26 +479,32 @@ class SshConnect(object):
             while stend - start < looptimer:
                 time.sleep(.1)
                 # self.logger.debug("Code 5: Inside while loop in rpexpect in thread ")
+                resp = ''
                 try:
                     resp = self.recv(bytes)
                 except socket.timeout:
                     self.logger.error(
-                        "rpexpect type 5 block: Timed out waiting for intial response.  Received response:  {0}".format(
-                            buff))
+                        "rpexpect type 5 block: Socket Timed out waiting for response.  Received response:  {0}: Buffer "
+                        "so far: {1}".format(resp, buff))
                     self.logger.debug(
                         "rpexpect: type 5 block: loop: stend - start: {}".format(stend - start)
                     )
+                except:
+                    self.logger.error(
+                        "rpexpect type 5 block: Error waiting for response.  Received response:  {0}: Buffer "
+                        "so far: {1}".format(resp, buff))
                     self.logger.debug(
-                        "rpexpect: type 5 block: Socket Timed out waiting for response.  Received response:  {0}".format(
-                            buff))
-                buff += resp
+                        "rpexpect: type 5 block: loop: stend - start: {}".format(stend - start)
+                    )
+                if resp:
+                    buff += resp
                 if self._channel.exit_status_ready():
                     self.logger.error(
-                        "rpexpect type 5 block: Detected server closed channel while waiting for expected response. Received response {0:s}".format(
+                        "rpexpect type 5 block: Detected server closed channel while waiting for expected response. Received response buffer {0:s}".format(
                             buff))
                     self.close()
                     raise ServerClosedChannelError(
-                        "Detected server closed channel while waiting for expected response. Received response {}".format(
+                        "Detected server closed channel while waiting for expected response. Received response buffer {}".format(
                             buff))
 
                 stend = time.time()
